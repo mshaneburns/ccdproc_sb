@@ -6,6 +6,7 @@ image files.
 
 Author: Shane Burns
 Date: 7/26/16
+Modified: 10/6/21, 9:21 AM
 """
 import numpy as np
 from astropy.io import fits
@@ -14,7 +15,7 @@ import datetime as dt
 
 # Allow import of personal modules
 import sys
-sys.path.append(r'/Users/sburns/lib/python')
+#sys.path.append(r'/Users/sburns/lib/python')
 
 def get_image(file_path, list_file_name):
     """Get image data from a collection of FITS files listed in 
@@ -256,7 +257,13 @@ def ccdproc(input_list='object_list.txt', output_list = None,
         hdu.header['object'] = image_header_list[idx]['object']
         hdu.header['exptime'] = image_header_list[idx]['exptime']
         hdu.header['gain'] = image_header_list[idx]['gain']
-        hdu.header['rdnoise'] = image_header_list[idx]['rdnoise']
+
+        try:
+            ast_readnoise = image_header_list[idx]['rdnoise']
+            hdu.header['rdnoise'] = ast_readnoise
+        except:
+            hdu.header['rdnoise'] = 'none'
+            
         try:
             ast_filter = image_header_list[idx]['filter']
             hdu.header['filter'] = ast_filter

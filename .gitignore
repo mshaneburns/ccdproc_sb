@@ -1,5 +1,12 @@
+# Ignore python cache
+__pycache__
+
 # Jupyter Notebook
 .ipynb_checkpoints
 
 # Ignore all images in image directory
 images
+
+# Ignore FITS files
+*.fits
+*.fit
