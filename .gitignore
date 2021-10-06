@@ -10,3 +10,6 @@ images
 # Ignore FITS files
 *.fits
 *.fit
+
+# Ignore Mac files
+.DS_Store
