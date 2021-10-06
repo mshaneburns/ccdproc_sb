@@ -11,11 +11,30 @@ Modified: 10/6/21, 9:21 AM
 import numpy as np
 from astropy.io import fits
 from os import getcwd
+from sys import exit
 import datetime as dt
 
-# Allow import of personal modules
-import sys
+# Import of sys
+#import sys
 #sys.path.append(r'/Users/sburns/lib/python')
+
+def set_imdir(imdir='images',absolute=False):
+    """Set the image directory.
+    The default is the `images` subdirectory of current working directory.
+    
+    Parameters
+    ----------
+    imagedirec : str
+        image directory name
+        
+    absolute : boolian
+        If True, imdir is the absolute path, if false it is path relative to 
+        the current working directory.
+    """
+    if (absolute==False):
+        imdir = getcwd()+'/'+imdir+'/'
+    return imdir
+    
 
 def get_image(file_path, list_file_name):
     """Get image data from a collection of FITS files listed in 
