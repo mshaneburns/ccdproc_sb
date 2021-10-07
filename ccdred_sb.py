@@ -282,7 +282,8 @@ def flatcombine(imdir='images/',input_list='flat_list.txt',output='Flat',zero_su
         return None
 
 def ccdproc(imdir='images/',input_list='object_list.txt', output_list = None,
-            zero_file='Zero.fits', flat_file='Flat.fits'):
+            zero_file='Zero.fits', flat_file='Flat.fits',
+            dark_correction=False,dark_file='Dark.fits'):
     """Like IRAF's `ccdproc`. 
     
     It currently works by: 
@@ -302,6 +303,10 @@ def ccdproc(imdir='images/',input_list='object_list.txt', output_list = None,
         Name of bias correction file
     flat_file : str
         Name of flat correction file       
+    dark_correction : boolean
+        applies dark correction if True
+    dark_file : str
+        dark current image file name
         
     Returns
     -------
@@ -349,12 +354,26 @@ def ccdproc(imdir='images/',input_list='object_list.txt', output_list = None,
         
     for idx in range(N_files):
         # Process images
-        image_data = (image_data_list[idx] - zero_img)/flat_img
+        exposure_time = image_header_list[idx]['exptime']
+        if dark_correction:
+            dark_path = imdir + dark_file
+            hdu_list = fits.open(dark_path)
+            dark_img = hdu_list[0].data
+            hdu_list.close()
+
+            background_img = dark_img*exposure_time + zero_img
+            print('Using dark current image: %s' % dark_file)
+            print('Using zero image: %s' % zero_file)
+        else:
+            background_img = zero_img
+            print('Using zero image: %s' % zero_file)
+        image_data = (image_data_list[idx] - background_img)/flat_img
+        print('Using flat image: %s' % flat_file)
         hdu = fits.PrimaryHDU(image_data)
 
         # Get input file header information
         hdu.header['object'] = image_header_list[idx]['object']
-        hdu.header['exptime'] = image_header_list[idx]['exptime']
+        hdu.header['exptime'] = exposure_time
 
         try:
             hdu.header['gain'] = image_header_list[idx]['gain']
