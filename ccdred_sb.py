@@ -10,31 +10,8 @@ Modified: 10/6/21, 9:21 AM
 """
 import numpy as np
 from astropy.io import fits
-from os import getcwd
 from sys import exit
 import datetime as dt
-
-# Import of sys
-#import sys
-#sys.path.append(r'/Users/sburns/lib/python')
-
-def set_imdir(imdir='images',absolute=False):
-    """Set the image directory.
-    The default is the `images` subdirectory of current working directory.
-    
-    Parameters
-    ----------
-    imagedirec : str
-        image directory name
-        
-    absolute : boolian
-        If True, imdir is the absolute path, if false it is path relative to 
-        the current working directory.
-    """
-    if (absolute==False):
-        imdir = getcwd()+'/'+imdir+'/'
-    return imdir
-    
 
 def get_image(file_path, list_file_name):
     """Get image data from a collection of FITS files listed in 
@@ -50,7 +27,7 @@ def get_image(file_path, list_file_name):
         List where each element is a numpy array containing the image
         data from one of the files in `list_file_name`.
     """
-    list_path = file_path + list_file_name
+    list_path = list_file_name
     
     file_names = open(list_path,'r')
     
@@ -72,14 +49,16 @@ def get_image(file_path, list_file_name):
     
     return image_data_list,image_head_list
 
-def zerocombine(input_list='zero_list.txt',output='Zero'):
+def zerocombine(imdir='images/',input_list='zero_list.txt',output='Zero'):
     """Like IRAF's `zerocombine`. It currently combines the frames by
     averaging all of the bias frames listed in the `input_list`. It writes
-    out a FITS file with the name given by the `output` parameter. Returns the
+    out a FITS file with the name given by the `output` parameter. Prints the
     `mean` and `sigma` (standard deviation) of the output file's pixel values.
     
     Parameters
     ----------
+    imdir : str
+    	Path to image directory (must include trailing '/')
     input_list : str
         Name of file containing list of filenames
     output : str
@@ -91,37 +70,122 @@ def zerocombine(input_list='zero_list.txt',output='Zero'):
         Name with `.fits` extension of created file
     """
     # Get the current path and open the file-list file 
-    cur_path = getcwd()+'/'
-    image_data_list,image_head_list = get_image(cur_path,input_list)
+    image_data_list,image_head_list = get_image(imdir,input_list)
     
     # Find the mean bias image 
     zero_data = np.mean(image_data_list,axis=0)
     
-    # Write the output FITS file    
+    # Write the master bias FITS file    
     fout_name = output+'.fits'
-    fout_path = cur_path+fout_name
+    fout_path = imdir+fout_name
     
     hdu = fits.PrimaryHDU(zero_data)
     # This assumes that the `gain` and `rdnoise` of all images is the same
-    hdu.header['gain'] = image_head_list[0]['gain']
-    hdu.header['rdnoise'] = image_head_list[0]['rdnoise']
-    hdu.header['imagetyp'] = 'bias'
+    try:
+        hdu.header['gain'] = image_head_list[0]['gain']
+    except:
+        print("Warning: 'GAIN' header keyword not found.")
+
+    try:
+        hdu.header['rdnoise'] = image_head_list[0]['rdnoise']
+    except:
+        print("Warning: 'RDNOISE' header keyword not found.")
+        
+    hdu.header['ccdtype'] = 'zero'        
     utc = dt.datetime.utcnow()
     time_stamp = utc.strftime('%b %d, %Y at %H:%M:%S UTC')
     hdu.header['comment'] = 'Master bias frame created ' + time_stamp
     hdulist = fits.HDUList([hdu])
-    hdulist.writeto(fout_path)
+    try:
+        hdulist.writeto(fout_path)
+        print('zerocombine output file name: %s' % fout_name)
+
+        # Compute return values    
+        pix_mean = np.mean(zero_data)
+        pix_sigma = np.std(zero_data)
+        print("    mean pixel value = %f" % pix_mean)
+        print("    standard deviation = %f" % pix_sigma)  
+        return fout_name
+    except:
+        print('\n*** Failed to write %s. ***' % fout_name)
+        print('*** The file may already exist. ***')
+        return None
     
-    print('zerocombine output file name: %s' % fout_name)
+#Begin**********************
+def darkcombine(imdir='images/',input_list='dark_list.txt',output='Dark'):
+    """Like IRAF's `darkcombine`. Creates dark current images and then it
+    currently combines the frames by averaging all of the dark current
+    frames listed in the `input_list`. It writes out a FITS file with the name
+    given by the `output` parameter. 
+    
+    Parameters
+    ----------
+    imdir : str
+    	Path to image directory (must include trailing '/')
+    input_list : str
+        Name of file containing list of filenames
+    output : str
+        Name for the output FITS file.
 
-    # Compute return values    
-    pix_mean = np.mean(zero_data)
-    pix_sigma = np.std(zero_data)
-    print("    mean pixel value = %f" % pix_mean)
-    print("    standard deviation = %f" % pix_sigma)    
-    return fout_name
+    Returns
+    -------
+    fout_name : str
+        Name with `.fits` extension of created file
+    """
+    # Get the current path and open the file-list file 
+    image_data_list,image_head_list = get_image(imdir,input_list)
+    
+    # Divide each data file by the exposure time for that file to 
+    # create dark current frames.
+    Ndarks = len(image_data_list)
+    dark_frames=[]
+    for idx in range(Ndarks):
+        exposure_time = image_head_list[idx]['exptime']
+        print('the exposure time is %g' % exposure_time)
+        dark_current = image_data_list[idx]/exposure_time
+        dark_frames.append(dark_current)
+    dark_data = np.mean(dark_frames,axis=0)
+    print('dark_data type %s'%type(dark_data))
+            
+    # Write the master bias FITS file    
+    fout_name = output+'.fits'
+    fout_path = imdir+fout_name
+    
+    hdu = fits.PrimaryHDU(dark_data)
+    # This assumes that the `gain` and `rdnoise` of all images is the same
+    try:
+        hdu.header['gain'] = image_head_list[0]['gain']
+    except:
+        print("Warning: 'GAIN' header keyword not found.")
 
-def flatcombine(input_list='flat_list.txt',output='Flat',zero_sub = True,
+    try:
+        hdu.header['rdnoise'] = image_head_list[0]['rdnoise']
+    except:
+        print("Warning: 'RDNOISE' header keyword not found.")
+        
+    hdu.header['ccdtype'] = 'dark'
+    hdu.header['exptime'] = 1        
+    utc = dt.datetime.utcnow()
+    time_stamp = utc.strftime('%b %d, %Y at %H:%M:%S UTC')
+    hdu.header['comment'] = 'Master dark current frame created ' + time_stamp
+    hdulist = fits.HDUList([hdu])
+    try:
+        hdulist.writeto(fout_path)
+        print('darkcombine output file name: %s' % fout_name)
+
+        # Compute return values    
+        pix_mean = np.mean(dark_data)
+        pix_sigma = np.std(dark_data)
+        print("    mean pixel value = %f" % pix_mean)
+        print("    standard deviation = %f" % pix_sigma)  
+        return fout_name
+    except:
+        print('\n*** Failed to write %s. ***' % fout_name)
+        print('*** The file may already exist. ***')
+        return None
+#end************************
+
+def flatcombine(imdir='images/',input_list='flat_list.txt',output='Flat',zero_sub = True,
                 zero_file = 'zero.fits'):
     """Like IRAF's `flatcombine`. 
     
@@ -133,6 +197,8 @@ def flatcombine(input_list='flat_list.txt',output='Flat',zero_sub = True,
     
     Parameters
     ----------
+    imdir : str
+    	Path to image directory (must include trailing '/')
     input_list : str
         Name of file containing list of filenames
     output : str
@@ -147,18 +213,16 @@ def flatcombine(input_list='flat_list.txt',output='Flat',zero_sub = True,
     fout_name : str
         Name with `.fits` extension of created file
     """
-    # get current path    
-    cur_path = getcwd()+'/'
 
     # Get `zero_file` data if needed
     if zero_sub:    
-        zero_path = cur_path + zero_file
+        zero_path = imdir + zero_file
         hdu_list = fits.open(zero_path)
         zero_img = hdu_list[0].data
         hdu_list.close()
 
     # Get the current path and open the file-list file 
-    image_data_list,image_head_list = get_image(cur_path,input_list)
+    image_data_list,image_head_list = get_image(imdir,input_list)
 
     # Create list of arrays for processed flats
     flat_data_list = []        
@@ -177,31 +241,47 @@ def flatcombine(input_list='flat_list.txt',output='Flat',zero_sub = True,
 
     # Create master flat    
     flat_data = np.median(flat_data_list,axis=0)
-    
-    # Write the output FITS file    
-    fout_name = output+'.fits'
-    fout_path = cur_path+fout_name
-    
+        
     hdu = fits.PrimaryHDU(flat_data)
-    # This assumes that the `gain` and `rdnoise` of all images is the same
+    # This assumes that the `filter`, `gain` and `rdnoise` of all images 
+    # are the same.
     try:
-        ast_filter = image_head_list[0]['filter']
+        ast_filter = image_head_list[0]['filter']       
         hdu.header['filter'] = ast_filter
+        fout_name = output+'_'+ast_filter+'.fits'
     except:
         hdu.header['filter'] = 'none'
-    hdu.header['gain'] = image_head_list[0]['gain']
-    hdu.header['rdnoise'] = image_head_list[0]['rdnoise']
-    hdu.header['imagetyp'] = 'flat'
+        fout_name = output+'.fits'
+        
+    try:
+        hdu.header['gain'] = image_head_list[0]['gain']
+    except:
+        print("Warning: 'GAIN' header keyword not found.")
+
+    try:
+        hdu.header['rdnoise'] = image_head_list[0]['rdnoise']
+    except:
+        print("Warning: 'RDNOISE' header keyword not found.")
+        
+    hdu.header['ccdtype'] = 'flat'
     utc = dt.datetime.utcnow()
     time_stamp = utc.strftime('%b %d, %Y at %H:%M:%S UTC')
     hdu.header['comment'] = 'Master flat frame created ' + time_stamp
     hdulist = fits.HDUList([hdu])
-    hdulist.writeto(fout_path)
     
-    print('flatcombine output file name: %s' % fout_name)
-    return fout_name
+    # Write the output FITS file    
+    fout_path = imdir+fout_name
+    
+    try:
+        hdulist.writeto(fout_path)   
+        print('flatcombine output file name: %s' % fout_name)
+        return fout_name
+    except:
+        print('\n*** Failed to write %s. ***' % fout_name)
+        print('*** The file may already exist. ***')
+        return None
 
-def ccdproc(input_list='object_list.txt', output_list = None,
+def ccdproc(imdir='images/',input_list='object_list.txt', output_list = None,
             zero_file='Zero.fits', flat_file='Flat.fits'):
     """Like IRAF's `ccdproc`. 
     
@@ -229,17 +309,17 @@ def ccdproc(input_list='object_list.txt', output_list = None,
         List of names of the processed images.
     """
     print('Running ccdproc')
-    # Get the current path and get object images
-    cur_path = getcwd()+'/'
-    image_data_list,image_header_list = get_image(cur_path,input_list)
+    
+    # Get get object images
+    image_data_list,image_header_list = get_image(imdir,input_list)
 
     # Get calibration images
-    zero_path = cur_path + zero_file
+    zero_path = imdir + zero_file
     hdu_list = fits.open(zero_path)
     zero_img = hdu_list[0].data
     hdu_list.close()
 
-    flat_path = cur_path + flat_file
+    flat_path = imdir + flat_file
     hdu_list = fits.open(flat_path)
     flat_img = hdu_list[0].data
     hdu_list.close()
@@ -247,14 +327,14 @@ def ccdproc(input_list='object_list.txt', output_list = None,
     # Create output filenames
     out_name_list = []
     if (output_list == None):
-        list_path = cur_path + input_list
+        list_path = input_list
         file_names = open(list_path,'r')
         for name in file_names:
             parts = name.split(sep='.')
             out_name = parts[0]+'_p.fits'
             out_name_list.append(out_name)
     else:
-        list_path = cur_path + output_list
+        list_path = imdir + output_list
         file_names = open(list_path,'r')
         for name in file_names:
             out_name = name.strip()
@@ -265,7 +345,7 @@ def ccdproc(input_list='object_list.txt', output_list = None,
     if (len(out_name_list) != N_files):
         print('ERROR!')
         print('Number of file names does not equal the number of images')
-        sys.exit
+        exit
         
     for idx in range(N_files):
         # Process images
@@ -275,13 +355,16 @@ def ccdproc(input_list='object_list.txt', output_list = None,
         # Get input file header information
         hdu.header['object'] = image_header_list[idx]['object']
         hdu.header['exptime'] = image_header_list[idx]['exptime']
-        hdu.header['gain'] = image_header_list[idx]['gain']
 
         try:
-            ast_readnoise = image_header_list[idx]['rdnoise']
-            hdu.header['rdnoise'] = ast_readnoise
+            hdu.header['gain'] = image_header_list[idx]['gain']
         except:
-            hdu.header['rdnoise'] = 'none'
+            print("Warning: 'GAIN' header keyword not found.")
+    
+        try:
+            hdu.header['rdnoise'] = image_header_list[idx]['rdnoise']
+        except:
+            print("Warning: 'RDNOISE' header keyword not found.")
             
         try:
             ast_filter = image_header_list[idx]['filter']
@@ -290,13 +373,17 @@ def ccdproc(input_list='object_list.txt', output_list = None,
             hdu.header['filter'] = 'none'
 
         # Update information
-        hdu.header['imagetyp'] = 'object'
+        hdu.header['ccdtype'] = 'object'
         utc = dt.datetime.utcnow()
         time_stamp = utc.strftime('%b %d, %Y at %H:%M:%S UTC')
         hdu.header['comment'] = 'Processed ' + time_stamp
         hdulist = fits.HDUList([hdu])
-        fout_path = cur_path + out_name_list[idx]        
-        hdulist.writeto(fout_path)        
+        fout_path = imdir + out_name_list[idx]
+        try:
+            hdulist.writeto(fout_path)
+        except:
+            print('\n*** Failed to write %s. ***' % fout_path)
+            print('*** The file may already exist. ***')
     return out_name_list
     
 def main():
