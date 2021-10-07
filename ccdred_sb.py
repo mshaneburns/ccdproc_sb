@@ -185,8 +185,10 @@ def darkcombine(imdir='images/',input_list='dark_list.txt',output='Dark'):
         return None
 #end************************
 
-def flatcombine(imdir='images/',input_list='flat_list.txt',output='Flat',zero_sub = True,
-                zero_file = 'zero.fits'):
+def flatcombine(imdir='images/',input_list='flat_list.txt',
+                output='Flat',
+                zero_sub = True,zero_file = 'zero.fits',
+                dark_correction = False,dark_file = 'Dark.fits'):
     """Like IRAF's `flatcombine`. 
     
     It currently works by: 
@@ -207,7 +209,10 @@ def flatcombine(imdir='images/',input_list='flat_list.txt',output='Flat',zero_su
         Flag for bias subtraction
     zero_file : str
         Name of bias file for bias subraction        
-        
+    dark_correction : boolean
+        Flag for dark subtraction
+    dark_file : str
+        Name of dark file for dark subraction        
     Returns
     -------
     fout_name : str
@@ -220,6 +225,12 @@ def flatcombine(imdir='images/',input_list='flat_list.txt',output='Flat',zero_su
         hdu_list = fits.open(zero_path)
         zero_img = hdu_list[0].data
         hdu_list.close()
+    # Get `dark_file` data if needed
+    if dark_correction:    
+        dark_path = imdir + dark_file
+        hdu_list = fits.open(dark_path)
+        dark_img = hdu_list[0].data
+        hdu_list.close()
 
     # Get the current path and open the file-list file 
     image_data_list,image_head_list = get_image(imdir,input_list)
@@ -228,11 +239,17 @@ def flatcombine(imdir='images/',input_list='flat_list.txt',output='Flat',zero_su
     flat_data_list = []        
 
     # Process individual flats and load into `flat_data_list`
+    idx=0
     for image_data in image_data_list:
         if zero_sub:        
             temp_data = image_data - zero_img
         else:
             temp_data = image_data
+            
+        if dark_correction:
+            temp_data = temp_data - dark_img*image_head_list[idx]['exptime']
+            print('Dark current correction with %s: ' % dark_file)
+        idx = idx + 1   
         med = np.median(temp_data)
         print('Flat image meadian = %f' % med)
         temp_data = temp_data/med
