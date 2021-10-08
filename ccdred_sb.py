@@ -111,7 +111,7 @@ def zerocombine(imdir='images/',input_list='zero_list.txt',output='Zero'):
         print('*** The file may already exist. ***')
         return None
     
-#Begin**********************
+
 def darkcombine(imdir='images/',input_list='dark_list.txt',output='Dark'):
     """Like IRAF's `darkcombine`. Creates dark current images and then it
     currently combines the frames by averaging all of the dark current
@@ -183,11 +183,11 @@ def darkcombine(imdir='images/',input_list='dark_list.txt',output='Dark'):
         print('\n*** Failed to write %s. ***' % fout_name)
         print('*** The file may already exist. ***')
         return None
-#end************************
+
 
 def flatcombine(imdir='images/',input_list='flat_list.txt',
                 output='Flat',
-                zero_sub = True,zero_file = 'zero.fits',
+                zero_sub = True,zero_file = 'Zero.fits',
                 dark_correction = False,dark_file = 'Dark.fits'):
     """Like IRAF's `flatcombine`. 
     
