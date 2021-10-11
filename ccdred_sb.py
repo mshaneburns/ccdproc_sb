@@ -1,4 +1,4 @@
-"""A module for performing CCD data reduction steps. 
+"""A module for performing CCD data reduction steps.
 
 `ccdred_sb` is modeled after IRAF's `imred.ccdred` package. It contains a set
 of functions for creating dark frames, creating a flats, and processing object
@@ -14,7 +14,9 @@ from sys import exit
 import datetime as dt
 
 def get_image(file_path, list_file_name):
-    """Get image data from a collection of FITS files listed in 
+    """Open a collection of images listed in `list_file_name`.
+    
+    Get image data from a collection of FITS files listed in 
     `list_file_name`. Gets *only* the image in the primary `hdu`.
     
     Parameters
@@ -50,7 +52,9 @@ def get_image(file_path, list_file_name):
     return image_data_list,image_head_list
 
 def zerocombine(imdir='images/',input_list='zero_list.txt',output='Zero'):
-    """Like IRAF's `zerocombine`. It currently combines the frames by
+    """Make master bias image.
+    
+    Like IRAF's `zerocombine`. It currently combines the frames by
     averaging all of the bias frames listed in the `input_list`. It writes
     out a FITS file with the name given by the `output` parameter. Prints the
     `mean` and `sigma` (standard deviation) of the output file's pixel values.
@@ -58,7 +62,7 @@ def zerocombine(imdir='images/',input_list='zero_list.txt',output='Zero'):
     Parameters
     ----------
     imdir : str
-    	Path to image directory (must include trailing '/')
+        Path to image directory (must include trailing '/')
     input_list : str
         Name of file containing list of filenames
     output : str
@@ -112,8 +116,11 @@ def zerocombine(imdir='images/',input_list='zero_list.txt',output='Zero'):
         return None
     
 
-def darkcombine(imdir='images/',input_list='dark_list.txt',output='Dark'):
-    """Like IRAF's `darkcombine`. Creates dark current images and then it
+def darkcombine(imdir='images/',input_list='dark_list.txt',output='Dark',
+                zero_sub = True,zero_file='Zero.fits',):
+    """Create master dark frame.
+    
+    Like IRAF's `darkcombine`. Creates dark current images and then it
     currently combines the frames by averaging all of the dark current
     frames listed in the `input_list`. It writes out a FITS file with the name
     given by the `output` parameter. 
@@ -121,11 +128,15 @@ def darkcombine(imdir='images/',input_list='dark_list.txt',output='Dark'):
     Parameters
     ----------
     imdir : str
-    	Path to image directory (must include trailing '/')
+        Path to image directory (must include trailing '/')
     input_list : str
         Name of file containing list of filenames
     output : str
         Name for the output FITS file.
+    zero_sub : boolean
+        Flag for bias subtraction
+    zero_file : str
+        Name of bias file for bias subraction 
 
     Returns
     -------
@@ -135,6 +146,15 @@ def darkcombine(imdir='images/',input_list='dark_list.txt',output='Dark'):
     # Get the current path and open the file-list file 
     image_data_list,image_head_list = get_image(imdir,input_list)
     
+    # Set the bias frame
+    if zero_sub:    
+        zero_path = imdir + zero_file
+        hdu_list = fits.open(zero_path)
+        zero_img = hdu_list[0].data
+        hdu_list.close()
+    else:
+        zero_img=0
+    
     # Divide each data file by the exposure time for that file to 
     # create dark current frames.
     Ndarks = len(image_data_list)
@@ -142,8 +162,10 @@ def darkcombine(imdir='images/',input_list='dark_list.txt',output='Dark'):
     for idx in range(Ndarks):
         exposure_time = image_head_list[idx]['exptime']
         print('the exposure time is %g' % exposure_time)
-        dark_current = image_data_list[idx]/exposure_time
+        dark_raw = image_data_list[idx] - zero_img
+        dark_current = dark_raw/exposure_time
         dark_frames.append(dark_current)
+          
     dark_data = np.mean(dark_frames,axis=0)
     print('dark_data type %s'%type(dark_data))
             
@@ -189,7 +211,7 @@ def flatcombine(imdir='images/',input_list='flat_list.txt',
                 output='Flat',
                 zero_sub = True,zero_file = 'Zero.fits',
                 dark_correction = False,dark_file = 'Dark.fits'):
-    """Like IRAF's `flatcombine`. 
+    """Like IRAF's `flatcombine`.
     
     It currently works by: 
     
@@ -200,7 +222,7 @@ def flatcombine(imdir='images/',input_list='flat_list.txt',
     Parameters
     ----------
     imdir : str
-    	Path to image directory (must include trailing '/')
+        Path to image directory (must include trailing '/')
     input_list : str
         Name of file containing list of filenames
     output : str
@@ -218,7 +240,6 @@ def flatcombine(imdir='images/',input_list='flat_list.txt',
     fout_name : str
         Name with `.fits` extension of created file
     """
-
     # Get `zero_file` data if needed
     if zero_sub:    
         zero_path = imdir + zero_file
@@ -301,7 +322,7 @@ def flatcombine(imdir='images/',input_list='flat_list.txt',
 def ccdproc(imdir='images/',input_list='object_list.txt', output_list = None,
             zero_file='Zero.fits', flat_file='Flat.fits',
             dark_correction=False,dark_file='Dark.fits'):
-    """Like IRAF's `ccdproc`. 
+    """Like IRAF's `ccdproc`.
     
     It currently works by: 
     
@@ -423,7 +444,7 @@ def ccdproc(imdir='images/',input_list='object_list.txt', output_list = None,
     return out_name_list
     
 def main():
-    """Print help if the module is run as a script"""
+    """Print help if the module is run as a script."""
     print('This is a module for performing CCD data reduction steps.')
     print('Import the module and use python help for documentation.')
 
