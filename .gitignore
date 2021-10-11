@@ -13,6 +13,3 @@ images
 
 # Ignore Mac files
 .DS_Store
-
-# Ignore image lists
-*list.txt
