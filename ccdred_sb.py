@@ -25,9 +25,9 @@ def get_image(file_path, list_file_name):
     
     Return
     ------
-    image_data_list : list of numpy arrays
-        List where each element is a numpy array containing the image
-        data from one of the files in `list_file_name`.
+    image_data_list, image_head_list : list, list
+        The first list contains the image data and the second list the
+        associated header.
     """
     list_path = list_file_name
     
