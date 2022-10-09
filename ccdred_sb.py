@@ -452,7 +452,7 @@ def ccdproc(imdir='images/',input_list='object_list.txt', output_list = None,
     return out_name_list
     
 def main():
-    """Print help if the module is run as a script."""
+    """Import the module and use python help for documentation."""
     print('This is a module for performing CCD data reduction steps.')
     print('Import the module and use python help for documentation.')
 
