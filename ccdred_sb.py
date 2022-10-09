@@ -288,8 +288,11 @@ def flatcombine(imdir='images/',input_list='flat_list.txt',
         hdu.header['filter'] = ast_filter
         fout_name = output+'_'+ast_filter+'.fits'
     except:
-        hdu.header['filter'] = 'none'
+        print("Warning: 'FILTER' header keyword not found.")
         fout_name = output+'.fits'
+        print("         File name set to: "+fout_name)
+        hdu.header['filter'] = 'none'
+        print("         'FILTER' set to 'none'")
         
     try:
         hdu.header['gain'] = image_head_list[0]['gain']
@@ -410,7 +413,11 @@ def ccdproc(imdir='images/',input_list='object_list.txt', output_list = None,
         hdu = fits.PrimaryHDU(image_data)
 
         # Get input file header information
-        hdu.header['object'] = image_header_list[idx]['object']
+        try:
+            hdu.header['object'] = image_header_list[idx]['object']
+        except: 
+            print("Warning: 'OBJECT' header keyword not found")
+                        
         hdu.header['exptime'] = exposure_time
 
         try:
@@ -427,7 +434,7 @@ def ccdproc(imdir='images/',input_list='object_list.txt', output_list = None,
             ast_filter = image_header_list[idx]['filter']
             hdu.header['filter'] = ast_filter
         except:
-            hdu.header['filter'] = 'none'
+            print("Warning: 'FILTER' header keyword not found.")
 
         # Update information
         hdu.header['ccdtype'] = 'object'
@@ -438,6 +445,7 @@ def ccdproc(imdir='images/',input_list='object_list.txt', output_list = None,
         fout_path = imdir + out_name_list[idx]
         try:
             hdulist.writeto(fout_path)
+            print('Writing file '+out_name_list[idx]+'\n')
         except:
             print('\n*** Failed to write %s. ***' % fout_path)
             print('*** The file may already exist. ***')
